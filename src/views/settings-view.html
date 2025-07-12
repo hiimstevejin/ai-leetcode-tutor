@@ -1,6 +1,19 @@
-<h3>Settings</h3>
-<div class="mb-3">
-  <label for="api-key-input">Gemini API Key</label>
-  <input type="password" id="api-key-input" />
+<div class="container">
+  <div class="header position-relative text-center mb-3">
+    <button
+      id="gobackBtn"
+      class="icn-btn position-absolute start-0 btn btn-link p-0"
+    >
+      <img src="/backarrow-icon.svg" alt="Back Arrow Icon" />
+    </button>
+    <h1 class="m-0">Settings</h1>
+  </div>
+
+  <div class="mb-3">
+    <label for="api-key-input" class="form-label">LLM API KEY</label>
+    <div class="input-group">
+      <input type="password" id="apiKeyInput" class="form-control shadow-none" placeholder="Enter API KEY"/>
+      <button class="btn btn-success" id="submitApiKey">Save</button>
+    </div>
+  </div>
 </div>
-<button id="go-back-btn">Back</button>
