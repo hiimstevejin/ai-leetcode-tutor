@@ -1,4 +1,5 @@
-import "./style.css";
+import "bootstrap/dist/css/bootstrap.min.css";
+import "./style/style.css";
 import mainViewHtml from "./views/main-view.html?raw";
 import settingsViewHtml from "./views/settings-view.html?raw";
 
@@ -7,10 +8,43 @@ const appContainer = document.querySelector<HTMLDivElement>("#app-container");
 function showMainView() {
   if (!appContainer) return;
   appContainer.innerHTML = mainViewHtml;
+  const getHintBtn = document.querySelector<HTMLButtonElement>("#hintBtn");
+  getHintBtn?.addEventListener("click", handleGetHint);
 
   const goToSettingsBtn =
     document.querySelector<HTMLButtonElement>("#settingsBtn");
   goToSettingsBtn?.addEventListener("click", showSettingsView);
+
+  function handleGetHint() {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const activeTab = tabs[0];
+      if (activeTab && activeTab.id) {
+        chrome.tabs.sendMessage(
+          activeTab.id,
+          { type: "HIGHLIGHT_PROBLEM" },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              console.log(chrome.runtime.lastError.message);
+              return;
+            }
+            console.log("Highlighting status:", response);
+          }
+        );
+
+        chrome.tabs.sendMessage(
+          activeTab.id,
+          { type: "GET_PROBLEM_DETAILS" },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              console.log(chrome.runtime.lastError.message);
+              return;
+            }
+            console.log("Received from content script:", response);
+          }
+        );
+      }
+    });
+  }
 }
 
 function showSettingsView() {
@@ -69,4 +103,3 @@ function showSettingsView() {
 }
 
 showMainView();
-
