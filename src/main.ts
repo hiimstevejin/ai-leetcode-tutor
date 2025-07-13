@@ -18,7 +18,35 @@ function showMainView() {
   function handleGetHint() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const activeTab = tabs[0];
+
       if (activeTab && activeTab.id) {
+        chrome.tabs.sendMessage(
+          activeTab.id,
+          { type: "GET_PROBLEM_DETAILS" },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              console.log(chrome.runtime.lastError.message);
+              return;
+            }
+            const { title, description } = response || {};
+            console.log("Received from content script:", title, description);
+
+            chrome.storage.sync.get(["LLM_API_KEY"], (result) => {
+              const apiKey = result["LLM_API_KEY"];
+              if (!apiKey) {
+                console.warn("Missing LLM API Key");
+                return;
+              }
+
+              const userPrompt = `Please help me understand how to solve the following problem 
+              Problem Title: ${title}
+              Problem Description: ${description}`;
+
+              sendAiRequest(apiKey, userPrompt);
+            });
+          }
+        );
+
         chrome.tabs.sendMessage(
           activeTab.id,
           { type: "HIGHLIGHT_PROBLEM" },
@@ -30,20 +58,39 @@ function showMainView() {
             console.log("Highlighting status:", response);
           }
         );
-
-        chrome.tabs.sendMessage(
-          activeTab.id,
-          { type: "GET_PROBLEM_DETAILS" },
-          (response) => {
-            if (chrome.runtime.lastError) {
-              console.log(chrome.runtime.lastError.message);
-              return;
-            }
-            console.log("Received from content script:", response);
-          }
-        );
       }
     });
+  }
+}
+
+// http request to send request to llm (gemini)
+async function sendAiRequest(apiKey: string, userPrompt: string) {
+  try {
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
+        apiKey,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: userPrompt }],
+              role: "user",
+            },
+          ],
+        }),
+      }
+    );
+
+    const data = await response.json();
+    console.log(
+      data.candidates?.[0]?.content?.parts?.[0]?.text || "No response"
+    );
+  } catch (error) {
+    console.error("LLM request failed:", error);
   }
 }
 
@@ -65,9 +112,8 @@ function showSettingsView() {
   });
 
   function handleApiKeySubmit() {
-    const apiKey = apiKeyInput?.value;
-    if (apiKeyInput) {
-      chrome.storage.sync.set({ LLM_API_KEY: apiKey }, function () {
+    if (apiKeyInput?.value) {
+      chrome.storage.sync.set({ LLM_API_KEY: apiKeyInput.value }, function () {
         console.log("LLM_API_KEY Saved to sync storage successfully");
       });
 
