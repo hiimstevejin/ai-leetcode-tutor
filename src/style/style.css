@@ -61,6 +61,17 @@ body {
   box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3);
 }
 
+.btn-solution {
+  background: linear-gradient(45deg, #007bff, #6610f2);
+  color: white;
+  grid-column: 1 / -1;
+}
+
+.btn-solution:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3);
+}
+
 .icn-btn{
   background: none;
   border: none;
@@ -86,5 +97,10 @@ body {
   100% {
     transform: scale(1);
   }
+}
+
+.formatted-text {
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 

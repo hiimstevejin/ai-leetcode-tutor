@@ -9,12 +9,22 @@ const appContainer = document.querySelector<HTMLDivElement>("#app-container");
 
 let hints: string[] = [];
 let solution: string = "";
+let currentHintIndex = 0;
 
 function showMainView() {
   if (!appContainer) return;
   appContainer.innerHTML = mainViewHtml;
+  currentHintIndex = 0;
+
   const getHintBtn = document.querySelector<HTMLButtonElement>("#hintBtn");
+  const nextHintBtn = document.querySelector<HTMLButtonElement>("#nextHintBtn");
+  const solutionBtn = document.querySelector<HTMLButtonElement>("#solutionBtn");
+  const hintContainer =
+    document.querySelector<HTMLDivElement>("#hint-container");
+
   getHintBtn?.addEventListener("click", handleGetHint);
+  nextHintBtn?.addEventListener("click", handleNextHint);
+  solutionBtn?.addEventListener("click", handleViewSolution);
 
   const goToSettingsBtn =
     document.querySelector<HTMLButtonElement>("#settingsBtn");
@@ -46,10 +56,14 @@ function showMainView() {
             const userPrompt = generateHintPrompt(title, description);
             sendAiRequest(apiKey, userPrompt).then((result) => {
               if (result) {
-                hints = result.hints
-                solution = result.solution
-                console.log("Hints Array:", hints);
-                console.log("Solution String:", solution);
+                hints = result.hints;
+                solution = result.solution;
+                displayHint();
+                getHintBtn?.classList.add("d-none");
+                if (hints.length > 1) {
+                  nextHintBtn?.classList.remove("d-none");
+                }
+                solutionBtn?.classList.remove("d-none");
               } else {
                 console.warn("No hints or solution received from AI.");
               }
@@ -70,6 +84,30 @@ function showMainView() {
         }
       );
     });
+  }
+
+  function displayHint() {
+    if (hintContainer && hints.length > 0) {
+      hintContainer.classList.add("formatted-text");
+      hintContainer.textContent = hints[currentHintIndex];
+    }
+  }
+
+  function handleNextHint() {
+    currentHintIndex++;
+    displayHint();
+    if (currentHintIndex >= hints.length - 1) {
+      nextHintBtn?.classList.add("d-none");
+    }
+  }
+
+  function handleViewSolution() {
+    if (hintContainer) {
+      hintContainer.classList.add("formatted-text");
+      hintContainer.textContent = solution;
+      nextHintBtn?.classList.add("d-none");
+      solutionBtn?.classList.add("d-none");
+    }
   }
 }
 
