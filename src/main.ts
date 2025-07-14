@@ -10,17 +10,15 @@ const appContainer = document.querySelector<HTMLDivElement>("#app-container");
 let hints: string[] = [];
 let solution: string = "";
 let currentHintIndex = 0;
+let problemTitle = "";
 
 function showMainView() {
   if (!appContainer) return;
   appContainer.innerHTML = mainViewHtml;
-  currentHintIndex = 0;
 
   const getHintBtn = document.querySelector<HTMLButtonElement>("#hintBtn");
   const nextHintBtn = document.querySelector<HTMLButtonElement>("#nextHintBtn");
   const solutionBtn = document.querySelector<HTMLButtonElement>("#solutionBtn");
-  const hintContainer =
-    document.querySelector<HTMLDivElement>("#hint-container");
 
   getHintBtn?.addEventListener("click", handleGetHint);
   nextHintBtn?.addEventListener("click", handleNextHint);
@@ -30,85 +28,151 @@ function showMainView() {
     document.querySelector<HTMLButtonElement>("#settingsBtn");
   goToSettingsBtn?.addEventListener("click", showSettingsView);
 
-  function handleGetHint() {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const activeTab = tabs[0];
+  // Load state on view load
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const activeTab = tabs[0];
+    if (!activeTab?.url) return;
+    const problemUrl = activeTab.url;
 
-      if (!activeTab?.id) return;
-
-      chrome.tabs.sendMessage(
-        activeTab.id,
-        { type: "GET_PROBLEM_DETAILS" },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            console.log(chrome.runtime.lastError.message);
-            return;
-          }
-
-          const { title, description } = response || {};
-          chrome.storage.sync.get(["LLM_API_KEY"], (result) => {
-            const apiKey = result["LLM_API_KEY"];
-            if (!apiKey) {
-              console.warn("Missing LLM API Key");
-              return;
-            }
-
-            const userPrompt = generateHintPrompt(title, description);
-            sendAiRequest(apiKey, userPrompt).then((result) => {
-              if (result) {
-                hints = result.hints;
-                solution = result.solution;
-                displayHint();
-                getHintBtn?.classList.add("d-none");
-                if (hints.length > 1) {
-                  nextHintBtn?.classList.remove("d-none");
-                }
-                solutionBtn?.classList.remove("d-none");
-              } else {
-                console.warn("No hints or solution received from AI.");
-              }
-            });
-          });
-        }
-      );
-
-      chrome.tabs.sendMessage(
-        activeTab.id,
-        { type: "HIGHLIGHT_PROBLEM" },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            console.log(chrome.runtime.lastError.message);
-            return;
-          }
-          console.log("Highlighting status:", response);
-        }
-      );
+    chrome.storage.local.get(problemUrl, (result) => {
+      const savedState = result[problemUrl];
+      if (savedState) {
+        hints = savedState.hints;
+        solution = savedState.solution;
+        currentHintIndex = savedState.currentHintIndex;
+        problemTitle = savedState.problemTitle;
+        updateUiFromState();
+      }
     });
-  }
+  });
+}
 
-  function displayHint() {
-    if (hintContainer && hints.length > 0) {
-      hintContainer.classList.add("formatted-text");
-      hintContainer.textContent = hints[currentHintIndex];
-    }
-  }
+function updateUiFromState() {
+  const getHintBtn = document.querySelector<HTMLButtonElement>("#hintBtn");
+  const nextHintBtn = document.querySelector<HTMLButtonElement>("#nextHintBtn");
+  const solutionBtn = document.querySelector<HTMLButtonElement>("#solutionBtn");
 
-  function handleNextHint() {
-    currentHintIndex++;
+  if (hints.length > 0) {
     displayHint();
-    if (currentHintIndex >= hints.length - 1) {
+    getHintBtn?.classList.add("d-none");
+    solutionBtn?.classList.remove("d-none");
+    if (currentHintIndex < hints.length - 1) {
+      nextHintBtn?.classList.remove("d-none");
+    } else {
       nextHintBtn?.classList.add("d-none");
     }
   }
+}
 
-  function handleViewSolution() {
-    if (hintContainer) {
-      hintContainer.classList.add("formatted-text");
-      hintContainer.textContent = solution;
-      nextHintBtn?.classList.add("d-none");
-      solutionBtn?.classList.add("d-none");
-    }
+function saveState(problemUrl: string) {
+  const state = {
+    hints,
+    solution,
+    currentHintIndex,
+    problemTitle,
+  };
+  chrome.storage.local.set({ [problemUrl]: state });
+}
+
+function handleGetHint() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const activeTab = tabs[0];
+
+    if (!activeTab?.id || !activeTab.url) return;
+    const problemUrl = activeTab.url;
+
+    chrome.tabs.sendMessage(
+      activeTab.id,
+      { type: "GET_PROBLEM_DETAILS" },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.log(chrome.runtime.lastError.message);
+          return;
+        }
+
+        const { title, description,codingLanguage } = response || {};
+        // save to global state
+        problemTitle = title;
+        // get API KEY from sync storage
+        chrome.storage.sync.get(["LLM_API_KEY"], (result) => {
+          const apiKey = result["LLM_API_KEY"];
+          if (!apiKey) {
+            console.warn("Missing LLM API Key");
+            return;
+          }
+          //Send API request to gemini
+          const userPrompt = generateHintPrompt(title, description,codingLanguage);
+          sendAiRequest(apiKey, userPrompt).then((result) => {
+            if (result) {
+              hints = result.hints;
+              solution = result.solution;
+              currentHintIndex = 0;
+              saveState(problemUrl);
+              updateUiFromState();
+            } else {
+              console.warn("No hints or solution received from AI.");
+            }
+          });
+        });
+      }
+    );
+
+    chrome.tabs.sendMessage(
+      activeTab.id,
+      { type: "HIGHLIGHT_PROBLEM" },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.log(chrome.runtime.lastError.message);
+          return;
+        }
+        console.log("Highlighting status:", response);
+      }
+    );
+  });
+}
+
+function displayHint() {
+  const hintContainer =
+    document.querySelector<HTMLDivElement>("#hint-container");
+  if (hintContainer && hints.length > 0) {
+    hintContainer.classList.add("formatted-text");
+    hintContainer.textContent = hints[currentHintIndex];
   }
+}
+
+function handleNextHint() {
+  currentHintIndex++;
+  displayHint();
+  if (currentHintIndex >= hints.length - 1) {
+    const nextHintBtn =
+      document.querySelector<HTMLButtonElement>("#nextHintBtn");
+    nextHintBtn?.classList.add("d-none");
+  }
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const activeTab = tabs[0];
+    if (!activeTab?.url) return;
+    saveState(activeTab.url);
+  });
+}
+
+function handleViewSolution() {
+  const hintContainer =
+    document.querySelector<HTMLDivElement>("#hint-container");
+  if (hintContainer) {
+    hintContainer.classList.add("formatted-text");
+    hintContainer.textContent = solution;
+    const nextHintBtn =
+      document.querySelector<HTMLButtonElement>("#nextHintBtn");
+    const solutionBtn =
+      document.querySelector<HTMLButtonElement>("#solutionBtn");
+    nextHintBtn?.classList.add("d-none");
+    solutionBtn?.classList.add("d-none");
+  }
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const activeTab = tabs[0];
+    if (!activeTab?.url) return;
+    chrome.storage.local.remove(activeTab.url);
+  });
 }
 
 function showSettingsView() {
@@ -166,3 +230,4 @@ function showSettingsView() {
 }
 
 showMainView();
+
