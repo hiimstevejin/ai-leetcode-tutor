@@ -2,6 +2,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./style/style.css";
 import mainViewHtml from "./views/main-view.html?raw";
 import settingsViewHtml from "./views/settings-view.html?raw";
+import fullSolutionViewHtml from "./views/fullsolution-view.html?raw";
 import { sendAiRequest } from "./utils/llm";
 import { generateHintPrompt } from "./utils/prompt";
 
@@ -22,7 +23,7 @@ function showMainView() {
 
   getHintBtn?.addEventListener("click", handleGetHint);
   nextHintBtn?.addEventListener("click", handleNextHint);
-  solutionBtn?.addEventListener("click", handleViewSolution);
+  solutionBtn?.addEventListener("click", () => showSolutionView(solution));
 
   const goToSettingsBtn =
     document.querySelector<HTMLButtonElement>("#settingsBtn");
@@ -89,8 +90,8 @@ function handleGetHint() {
           console.log(chrome.runtime.lastError.message);
           return;
         }
-
-        const { title, description,codingLanguage } = response || {};
+        console.log(response)
+        const { title, description, codingLanguage } = response || {};
         // save to global state
         problemTitle = title;
         // get API KEY from sync storage
@@ -101,7 +102,11 @@ function handleGetHint() {
             return;
           }
           //Send API request to gemini
-          const userPrompt = generateHintPrompt(title, description,codingLanguage);
+          const userPrompt = generateHintPrompt(
+            title,
+            description,
+            codingLanguage
+          );
           sendAiRequest(apiKey, userPrompt).then((result) => {
             if (result) {
               hints = result.hints;
@@ -155,23 +160,75 @@ function handleNextHint() {
   });
 }
 
-function handleViewSolution() {
-  const hintContainer =
-    document.querySelector<HTMLDivElement>("#hint-container");
-  if (hintContainer) {
-    hintContainer.classList.add("formatted-text");
-    hintContainer.textContent = solution;
-    const nextHintBtn =
-      document.querySelector<HTMLButtonElement>("#nextHintBtn");
-    const solutionBtn =
-      document.querySelector<HTMLButtonElement>("#solutionBtn");
-    nextHintBtn?.classList.add("d-none");
-    solutionBtn?.classList.add("d-none");
+function showSolutionView(solution: string) {
+  if (!appContainer) return;
+  appContainer.innerHTML = fullSolutionViewHtml;
+
+  const solutionText = document.querySelector<HTMLParagraphElement>(
+    "#full-solution-text"
+  );
+  if (solutionText) {
+    solutionText.classList.add("formatted-text");
+    solutionText.textContent = solution;
   }
+
+  const backBtn = document.querySelector<HTMLButtonElement>(
+    "#back-to-main-view-from-solution"
+  );
+  backBtn?.addEventListener("click", showMainView);
+
+  const copyBtn =
+    document.querySelector<HTMLButtonElement>("#copy-code-button");
+  copyBtn?.addEventListener("click", () => handleCopyCode(solution));
+
+  const injectBtn = document.querySelector<HTMLButtonElement>(
+    "#inject-code-button"
+  );
+  injectBtn?.addEventListener("click", () => handleInjectCode(solution));
+
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const activeTab = tabs[0];
     if (!activeTab?.url) return;
     chrome.storage.local.remove(activeTab.url);
+  });
+}
+
+function handleCopyCode(code: string) {
+  const codeWithoutTicks = code.replace(/```/g, "").replace(/^[a-zA-Z]+\n/, "");
+  console.log(codeWithoutTicks);
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const activeTab = tabs[0];
+    if (!activeTab?.id) return;
+    chrome.tabs.sendMessage(
+      activeTab.id,
+      { type: "COPY_CODE", code: codeWithoutTicks },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.error(chrome.runtime.lastError.message);
+          return;
+        }
+        console.log("Copy status:", response.status);
+      }
+    );
+  });
+}
+
+function handleInjectCode(code: string) {
+  const codeWithoutTicks = code.replace(/```/g, "").replace(/^[a-zA-Z]+\n/, "");
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const activeTab = tabs[0];
+    if (!activeTab?.id) return;
+    chrome.tabs.sendMessage(
+      activeTab.id,
+      { type: "INJECT_CODE", code: codeWithoutTicks },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.error(chrome.runtime.lastError.message);
+          return;
+        }
+        console.log("Inject status:", response.status);
+      }
+    );
   });
 }
 
@@ -230,4 +287,3 @@ function showSettingsView() {
 }
 
 showMainView();
-
