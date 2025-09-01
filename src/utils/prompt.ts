@@ -16,6 +16,7 @@ Separate the hints and the code using the token ---Optimal Solution---.
 
 Include time and space complexity in comments above the function.
 
+STRICTLY GIVE HINTS AND SOLUTION NO CONVERSATION OR IRRELEVANT CONTENT IS NEEDED
 
 Problem Title: ${title}
 Problem Description: ${description}`.trim();

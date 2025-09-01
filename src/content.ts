@@ -67,29 +67,24 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     }
 
     sendResponse({ status: "highlighting done" });
-  } else if (request.type === "COPY_CODE") {
-    const code = request.code;
-    navigator.clipboard
-      .writeText(code)
-      .then(() => {
-        sendResponse({ status: "copied" });
-      })
-      .catch((err) => {
-        console.error("Failed to copy code: ", err);
-        sendResponse({ status: "failed" });
-      });
-    return true; // async response
+    
   } else if (request.type === "INJECT_CODE") {
     const codeToInject = request.code;
     const script = document.createElement("script");
     script.textContent = `
-        if (window.monaco && typeof window.monaco.editor.getModels === 'function' && window.monaco.editor.getModels().length > 0) {
-            window.monaco.editor.getModels()[0].setValue(${JSON.stringify(
-              codeToInject
-            )});
-        } else {
-            console.error("AI LeetCode Tutor: Monaco editor instance not found.");
-        }
+        setTimeout(() => {
+            if (window.monaco && typeof window.monaco.editor.getEditors === 'function' && window.monaco.editor.getEditors().length > 0) {
+                const editor = window.monaco.editor.getEditors()[0]; // Get the first editor instance
+                if (editor) {
+                    editor.setValue(${JSON.stringify(codeToInject)});
+                    console.log("AI LeetCode Tutor: Code injected into Monaco editor.");
+                } else {
+                    console.error("AI LeetCode Tutor: Monaco editor instance not found or not ready.");
+                }
+            } else {
+                console.error("AI LeetCode Tutor: Monaco editor API not available or no editors found.");
+            }
+        }, 500); // Add a small delay to ensure the editor is ready
     `;
     (document.head || document.documentElement).appendChild(script);
     script.remove();
@@ -97,3 +92,4 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     return true;
   }
 });
+

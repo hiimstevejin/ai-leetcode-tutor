@@ -15,8 +15,10 @@ let problemTitle = "";
 
 function showMainView() {
   if (!appContainer) return;
+  // show main view
   appContainer.innerHTML = mainViewHtml;
 
+  // hydrate buttons
   const getHintBtn = document.querySelector<HTMLButtonElement>("#hintBtn");
   const nextHintBtn = document.querySelector<HTMLButtonElement>("#nextHintBtn");
   const solutionBtn = document.querySelector<HTMLButtonElement>("#solutionBtn");
@@ -29,7 +31,7 @@ function showMainView() {
     document.querySelector<HTMLButtonElement>("#settingsBtn");
   goToSettingsBtn?.addEventListener("click", showSettingsView);
 
-  // Load state on view load
+  // Load state on view load hint state, solution state, currentHintIndex state, problemTitle state
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const activeTab = tabs[0];
     if (!activeTab?.url) return;
@@ -90,7 +92,7 @@ function handleGetHint() {
           console.log(chrome.runtime.lastError.message);
           return;
         }
-        console.log(response)
+        console.log(response);
         const { title, description, codingLanguage } = response || {};
         // save to global state
         problemTitle = title;
@@ -196,21 +198,15 @@ function showSolutionView(solution: string) {
 function handleCopyCode(code: string) {
   const codeWithoutTicks = code.replace(/```/g, "").replace(/^[a-zA-Z]+\n/, "");
   console.log(codeWithoutTicks);
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const activeTab = tabs[0];
-    if (!activeTab?.id) return;
-    chrome.tabs.sendMessage(
-      activeTab.id,
-      { type: "COPY_CODE", code: codeWithoutTicks },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          console.error(chrome.runtime.lastError.message);
-          return;
-        }
-        console.log("Copy status:", response.status);
-      }
-    );
-  });
+  navigator.clipboard
+    .writeText(codeWithoutTicks)
+    .then(() => {
+      console.log("Copy status: copied");
+    })
+    .catch((err) => {
+      console.error("Failed to copy code: ", err);
+      console.log("Copy status: failed");
+    });
 }
 
 function handleInjectCode(code: string) {
@@ -236,6 +232,7 @@ function showSettingsView() {
   if (!appContainer) return;
   appContainer.innerHTML = settingsViewHtml;
 
+  // hydrate
   const goBackBtn = document.querySelector<HTMLButtonElement>("#gobackBtn");
   goBackBtn?.addEventListener("click", showMainView);
 
@@ -243,6 +240,7 @@ function showSettingsView() {
   const apiKeySubmitButton =
     document.querySelector<HTMLButtonElement>("#submitApiKey");
 
+  // when opening settings get presaved api key from sync storage
   chrome.storage.sync.get(["LLM_API_KEY"], (result) => {
     if (apiKeyInput && result["LLM_API_KEY"]) {
       apiKeyInput.value = result["LLM_API_KEY"];
@@ -250,6 +248,7 @@ function showSettingsView() {
   });
 
   function handleApiKeySubmit() {
+    // store api key in sync storage
     if (apiKeyInput?.value) {
       chrome.storage.sync.set({ LLM_API_KEY: apiKeyInput.value }, function () {
         console.log("LLM_API_KEY Saved to sync storage successfully");

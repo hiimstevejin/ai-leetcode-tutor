@@ -3,7 +3,7 @@
   "name": "Leetcode Buddy",
   "version": "1.0.0",
   "description": "A smart Leetcode buddy that helps you analyze and solve leetcode step-by-step",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting", "storage", "clipboardWrite"],
   "action": {
     "default_popup": "index.html"
   },
