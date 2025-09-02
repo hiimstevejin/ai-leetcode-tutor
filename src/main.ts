@@ -202,6 +202,23 @@ function handleCopyCode(code: string) {
     .writeText(codeWithoutTicks)
     .then(() => {
       console.log("Copy status: copied");
+      const successAlert = document.createElement("div");
+      successAlert.className =
+        "alert alert-success alert-dismissible fade show";
+      successAlert.role = "alert";
+      successAlert.innerHTML = "Copied to Clipboard";
+
+      const container = document.querySelector(".container");
+      if (container) {
+        container.prepend(successAlert);
+
+        setTimeout(() => {
+          successAlert.classList.remove("show");
+          successAlert.addEventListener("transitionend", () => {
+            successAlert.remove();
+          });
+        }, 2000);
+      }
     })
     .catch((err) => {
       console.error("Failed to copy code: ", err);
